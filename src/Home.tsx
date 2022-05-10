@@ -11,11 +11,13 @@ import {Snackbar, Paper, LinearProgress, Chip} from "@material-ui/core";
 import Alert from "@material-ui/lab/Alert";
 import {toDate, AlertState, getAtaForMint} from './utils';
 import {MintButton} from './MintButton';
+import {MultiMintButton} from './MultiMintButton';
 import {
     CandyMachine,
     awaitTransactionSignatureConfirmation,
     getCandyMachineState,
     mintOneToken,
+    mintMultipleToken,
     CANDY_MACHINE_PROGRAM,
 } from "./candy-machine";
 
@@ -27,7 +29,7 @@ const WalletContainer = styled.div`
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: right;
 `;
 
 const WalletAmount = styled.div`
@@ -71,21 +73,16 @@ const ConnectButton = styled(WalletMultiButton)`
 
 const NFT = styled(Paper)`
   min-width: 500px;
+  margin: 0 auto;
   padding: 5px 20px 20px 20px;
   flex: 1 1 auto;
   background-color: var(--card-background-color) !important;
   box-shadow: 0 14px 28px rgba(0,0,0,0.25), 0 10px 10px rgba(0,0,0,0.22) !important;
 `;
 
-const Des = styled(NFT)`
-  text-align: left;
-  padding-top: 0px;
-`;
-
-
 const Card = styled(Paper)`
   display: inline-block;
-  background-color: var(card-background-lighter-color) !important;
+  background-color: var(--countdown-background-color) !important;
   margin: 5px;
   min-width: 40px;
   padding: 24px;
@@ -116,46 +113,6 @@ const MintButtonContainer = styled.div`
     0% {
       box-shadow: 0 0 0 0 #ef8f6e;
     }
-  }
-`;
-
-const Logo = styled.div`
-  flex: 0 0 auto;
-
-  img {
-    height: 60px;
-  }
-`;
-const Menu = styled.ul`
-  list-style: none;
-  display: inline-flex;
-  flex: 1 0 auto;
-
-  li {
-    margin: 0 12px;
-
-    a {
-      color: var(--main-text-color);
-      list-style-image: none;
-      list-style-position: outside;
-      list-style-type: none;
-      outline: none;
-      text-decoration: none;
-      text-size-adjust: 100%;
-      touch-action: manipulation;
-      transition: color 0.3s;
-      padding-bottom: 15px;
-
-      img {
-        max-height: 26px;
-      }
-    }
-
-    a:hover, a:active {
-      color: rgb(131, 146, 161);
-      border-bottom: 4px solid var(--title-text-color);
-    }
-
   }
 `;
 
@@ -223,7 +180,7 @@ const BorderLinearProgress = styled(LinearProgress)`
   border: 2px solid white;
   box-shadow: 5px 5px 40px 5px rgba(0,0,0,0.5);
   background-color:var(--main-text-color) !important;
-  
+
   > div.MuiLinearProgress-barColorPrimary{
     background-color:var(--title-text-color) !important;
   }
@@ -233,36 +190,6 @@ const BorderLinearProgress = styled(LinearProgress)`
     background-image: linear-gradient(270deg, rgba(255, 255, 255, 0.01), rgba(255, 255, 255, 0.5));
   }
 `;
-
-const ShimmerTitle = styled.h1`
-  margin: 20px auto;
-  text-transform: uppercase;
-  animation: glow 2s ease-in-out infinite alternate;
-  color: var(--main-text-color);
-  @keyframes glow {
-    from {
-      text-shadow: 0 0 20px var(--main-text-color);
-    }
-    to {
-      text-shadow: 0 0 30px var(--title-text-color), 0 0 10px var(--title-text-color);
-    }
-  }
-`;
-
-const GoldTitle = styled.h2`
-  color: var(--title-text-color);
-`;
-
-const LogoAligner = styled.div`
-  display: flex;
-  align-items: center;
-
-  img {
-    max-height: 35px;
-    margin-right: 10px;
-  }
-`;
-
 
 export interface HomeProps {
     candyMachineId: anchor.web3.PublicKey;
@@ -302,6 +229,7 @@ const Home = (props: HomeProps) => {
     const [candyMachine, setCandyMachine] = useState<CandyMachine>();
 
     const rpcUrl = props.rpcHost;
+    const solFeesEstimation = 0.012; // approx of account creation fees
 
     const refreshCandyMachineState = () => {
         (async () => {
@@ -331,7 +259,7 @@ const Home = (props: HomeProps) => {
                 setPriceLabel(splTokenName);
                 setPrice(cndy.state.price.toNumber() / divider);
                 setWhitelistPrice(cndy.state.price.toNumber() / divider);
-            }else {
+            } else {
                 setPrice(cndy.state.price.toNumber() / LAMPORTS_PER_SOL);
                 setWhitelistPrice(cndy.state.price.toNumber() / LAMPORTS_PER_SOL);
             }
@@ -432,19 +360,18 @@ const Home = (props: HomeProps) => {
         );
     };
 
-    function displaySuccess(mintPublicKey: any): void {
-        let remaining = itemsRemaining - 1;
+    function displaySuccess(mintPublicKey: any, qty: number = 1): void {
+        let remaining = itemsRemaining - qty;
         setItemsRemaining(remaining);
         setIsSoldOut(remaining === 0);
         if (isBurnToken && whitelistTokenBalance && whitelistTokenBalance > 0) {
-            let balance = whitelistTokenBalance - 1;
+            let balance = whitelistTokenBalance - qty;
             setWhitelistTokenBalance(balance);
             setIsActive(isPresale && !isEnded && balance > 0);
         }
-        setItemsRedeemed(itemsRedeemed + 1);
-        const solFeesEstimation = 0.012; // approx
+        setItemsRedeemed(itemsRedeemed + qty);
         if (!payWithSplToken && balance && balance > 0) {
-            setBalance(balance - (whitelistEnabled ? whitelistPrice : price) - solFeesEstimation);
+            setBalance(balance - ((whitelistEnabled ? whitelistPrice : price) * qty) - solFeesEstimation);
         }
         setSolanaExplorerLink(cluster === "devnet" || cluster === "testnet"
             ? ("https://solscan.io/token/" + mintPublicKey + "?cluster=" + cluster)
@@ -460,45 +387,148 @@ const Home = (props: HomeProps) => {
         });
     }
 
-    const onMint = async () => {
-        try {
-            setIsMinting(true);
-            if (wallet && candyMachine?.program && wallet.publicKey) {
-                const mint = anchor.web3.Keypair.generate();
-                const mintTxId = (
-                    await mintOneToken(candyMachine, wallet.publicKey, mint)
-                )[0];
+    function sleep(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
 
-                let status: any = {err: true};
-                if (mintTxId) {
-                    status = await awaitTransactionSignatureConfirmation(
-                        mintTxId,
+    async function mintMany(quantityString: number) {
+        if (wallet && candyMachine?.program && wallet.publicKey) {
+            const quantity = Number(quantityString);
+            const futureBalance = (balance || 0) - ((whitelistEnabled && (whitelistTokenBalance > 0) ? whitelistPrice : price) * quantity);
+            const signedTransactions: any = await mintMultipleToken(
+                candyMachine,
+                wallet.publicKey,
+                quantity
+            );
+
+            const promiseArray = [];
+
+            for (
+                let index = 0;
+                index < signedTransactions.length;
+                index++
+            ) {
+                const tx = signedTransactions[index];
+                promiseArray.push(
+                    awaitTransactionSignatureConfirmation(
+                        tx,
                         props.txTimeout,
                         props.connection,
-                        'singleGossip',
-                        true,
-                    );
-                }
+                        "singleGossip",
+                        true
+                    )
+                );
+            }
 
-                if (!status?.err) {
-                    setAlertState({
-                        open: true,
-                        message: 'Congratulations! Mint succeeded!',
-                        severity: 'success',
-                    });
+            const allTransactionsResult = await Promise.all(promiseArray);
+            let totalSuccess = 0;
+            let totalFailure = 0;
 
-                    // update front-end amounts
-                    displaySuccess(mint.publicKey);
+            for (
+                let index = 0;
+                index < allTransactionsResult.length;
+                index++
+            ) {
+                const transactionStatus = allTransactionsResult[index];
+                if (!transactionStatus?.err) {
+                    totalSuccess += 1;
                 } else {
-                    setAlertState({
-                        open: true,
-                        message: 'Mint failed! Please try again!',
-                        severity: 'error',
-                    });
+                    totalFailure += 1;
                 }
             }
+
+            let retry = 0;
+            if (allTransactionsResult.length > 0) {
+                let newBalance =
+                    (await props.connection.getBalance(wallet.publicKey)) /
+                    LAMPORTS_PER_SOL;
+
+
+                while (newBalance > futureBalance && retry < 20) {
+                    await sleep(2000);
+                    newBalance =
+                        (await props.connection.getBalance(wallet.publicKey)) /
+                        LAMPORTS_PER_SOL;
+                    retry++;
+                    console.log("Estimated balance (" + futureBalance + ") not correct yet, wait a little bit and re-check. Current balance : " + newBalance + ", Retry " + retry);
+                }
+            }
+
+            if (totalSuccess && retry < 20) {
+                setAlertState({
+                    open: true,
+                    message: `Congratulations! Your ${quantity} mints succeeded!`,
+                    severity: 'success',
+                });
+
+                // update front-end amounts
+                displaySuccess(wallet.publicKey, quantity);
+            }
+
+            if (totalFailure || retry === 20) {
+                setAlertState({
+                    open: true,
+                    message: `Some mints failed! (possibly ${totalFailure}) Wait a few minutes and check your wallet.`,
+                    severity: 'error',
+                });
+            }
+
+            if (totalFailure === 0 && totalSuccess === 0) {
+                setAlertState({
+                    open: true,
+                    message: `Mints manually cancelled.`,
+                    severity: 'error',
+                });
+            }
+        }
+    }
+
+    async function mintOne() {
+        if (wallet && candyMachine?.program && wallet.publicKey) {
+            const mint = anchor.web3.Keypair.generate();
+            const mintTxId = (
+                await mintOneToken(candyMachine, wallet.publicKey, mint)
+            )[0];
+
+            let status: any = {err: true};
+            if (mintTxId) {
+                status = await awaitTransactionSignatureConfirmation(
+                    mintTxId,
+                    props.txTimeout,
+                    props.connection,
+                    'singleGossip',
+                    true,
+                );
+            }
+
+            if (!status?.err) {
+                setAlertState({
+                    open: true,
+                    message: 'Congratulations! Mint succeeded!',
+                    severity: 'error',
+                });
+
+                // update front-end amounts
+                displaySuccess(mint.publicKey);
+            } else {
+                setAlertState({
+                    open: true,
+                    message: 'Mint failed! Please try again!',
+                    severity: 'success',
+                });
+            }
+        }
+    }
+
+    const startMint = async (quantityString: number) => {
+        try {
+            setIsMinting(true);
+            if (quantityString === 1) {
+                await mintOne();
+            } else {
+                await mintMany(quantityString);
+            }
         } catch (error: any) {
-            // TODO: blech:
             let message = error.msg || 'Minting failed! Please try again!';
             if (!error.msg) {
                 if (!error.message) {
@@ -527,7 +557,6 @@ const Home = (props: HomeProps) => {
         }
     };
 
-
     useEffect(() => {
         (async () => {
             if (wallet) {
@@ -549,39 +578,27 @@ const Home = (props: HomeProps) => {
         <main>
             <MainContainer>
                 <WalletContainer>
-                    <Logo><a href="http://localhost:3000/" target="_blank" rel="noopener noreferrer"><img alt=""
-                                                                                                          src="logo.png"/></a></Logo>
-                    <Menu>
-                        <li><a href="http://localhost:3000/" target="_blank" rel="noopener noreferrer">Menu 1</a>
-                        </li>
-                        <li><a href="http://localhost:3000/" target="_blank"
-                               rel="noopener noreferrer">Menu 2</a></li>
-                        <li><a href="http://localhost:3000/" target="_blank"
-                               rel="noopener noreferrer">Menu 3</a></li>
-                    </Menu>
                     <Wallet>
                         {wallet ?
                             <WalletAmount>{(balance || 0).toLocaleString()} SOL<ConnectButton/></WalletAmount> :
                             <ConnectButton>Connect Wallet</ConnectButton>}
                     </Wallet>
                 </WalletContainer>
-                <ShimmerTitle>MINT IS LIVE !</ShimmerTitle>
                 <br/>
                 <MintContainer>
                     <DesContainer>
                         <NFT elevation={3}>
-                            <h2>My NFT</h2>
+                            <h2>Mint a Billionaire SolBear</h2>
                             <br/>
                             <div><Price
                                 label={isActive && whitelistEnabled && (whitelistTokenBalance > 0) ? (whitelistPrice + " " + priceLabel) : (price + " " + priceLabel)}/><Image
-                                src="cool-cats.gif"
+                                src="SolBear.gif"
                                 alt="NFT To Mint"/></div>
                             <br/>
                             {wallet && isActive && whitelistEnabled && (whitelistTokenBalance > 0) && isBurnToken &&
                               <h3>You own {whitelistTokenBalance} WL mint {whitelistTokenBalance > 1 ? "tokens" : "token" }.</h3>}
                             {wallet && isActive && whitelistEnabled && (whitelistTokenBalance > 0) && !isBurnToken &&
                               <h3>You are whitelisted and allowed to mint.</h3>}
-
                             {wallet && isActive && endDate && Date.now() < endDate.getTime() &&
                               <Countdown
                                 date={toDate(candyMachine?.state?.endSettings?.number)}
@@ -635,17 +652,26 @@ const Home = (props: HomeProps) => {
                                                     isActive={isActive}
                                                     isEnded={isEnded}
                                                     isSoldOut={isSoldOut}
-                                                    onMint={onMint}
+                                                    onMint={startMint}
                                                 />
                                             </GatewayProvider>
                                         ) : (
-                                            <MintButton
+                                            /*<MintButton
                                                 candyMachine={candyMachine}
                                                 isMinting={isMinting}
                                                 isActive={isActive}
                                                 isEnded={isEnded}
                                                 isSoldOut={isSoldOut}
-                                                onMint={onMint}
+                                                onMint={startMint}
+                                            />*/
+                                            <MultiMintButton
+                                                candyMachine={candyMachine}
+                                                isMinting={isMinting}
+                                                isActive={isActive}
+                                                isEnded={isEnded}
+                                                isSoldOut={isSoldOut}
+                                                onMint={startMint}
+                                                price={whitelistEnabled && (whitelistTokenBalance > 0) ? whitelistPrice : price}
                                             />
                                         ) :
                                         <h1>Mint is private.</h1>
@@ -655,35 +681,6 @@ const Home = (props: HomeProps) => {
                             {wallet && isActive && solanaExplorerLink &&
                               <SolExplorerLink href={solanaExplorerLink} target="_blank">View on Solscan</SolExplorerLink>}
                         </NFT>
-                    </DesContainer>
-                    <DesContainer>
-                        <Des elevation={2}>
-                            <LogoAligner><img src="logo.png" alt=""></img><GoldTitle>TITLE 1</GoldTitle></LogoAligner>
-                            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
-                                incididunt.</p>
-                            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
-                                incididunt.</p>
-                            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
-                                incididunt.</p>
-                        </Des>
-                        <Des elevation={2}>
-                            <LogoAligner><img src="logo.png" alt=""></img><GoldTitle>TITLE 2</GoldTitle></LogoAligner>
-                            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
-                                incididunt.</p>
-                            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
-                                incididunt.</p>
-                            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
-                                incididunt.</p>
-                        </Des>
-                        <Des elevation={2}>
-                            <LogoAligner><img src="logo.png" alt=""></img><GoldTitle>TITLE 3</GoldTitle></LogoAligner>
-                            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
-                                incididunt.</p>
-                            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
-                                incididunt.</p>
-                            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
-                                incididunt.</p>
-                        </Des>
                     </DesContainer>
                 </MintContainer>
             </MainContainer>
